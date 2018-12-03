@@ -3,13 +3,14 @@ package utils;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.openstreetmap.osmosis.core.container.v0_6.EntityContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.NodeContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.RelationContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.WayContainer;
-import org.openstreetmap.osmosis.core.domain.v0_6.Node;
 import org.openstreetmap.osmosis.core.domain.v0_6.Tag;
 import org.openstreetmap.osmosis.core.domain.v0_6.Way;
 import org.openstreetmap.osmosis.core.task.v0_6.Sink;
@@ -17,9 +18,9 @@ import org.openstreetmap.osmosis.core.task.v0_6.Sink;
 import crosby.binary.osmosis.OsmosisReader;
 
 public class PbfReader implements Sink {
-    private static final String[] eleUnits = new String[] {" m"};
-    
     private int nodes = 0, rels = 0;
+    private boolean started = false;
+    private HashMap<String, PrintWriter> outs = new HashMap<String, PrintWriter>();
     
     public static void main(String[] args) {
         InputStream inp;
@@ -30,6 +31,8 @@ public class PbfReader implements Sink {
             osm.setSink(pbfR);
             osm.run();
             System.out.println(pbfR.nodes + "   " + pbfR.rels);
+            for(PrintWriter out : pbfR.outs.values())
+                out.close();
         } catch (FileNotFoundException ex) {
             ex.printStackTrace();
         }
@@ -40,14 +43,18 @@ public class PbfReader implements Sink {
     
     @Override
     public void process(EntityContainer entityContainer) {
+        if(!started) {
+            started = true;
+            System.out.println("Processing started @ " + System.currentTimeMillis());
+        }
         if(entityContainer instanceof NodeContainer) {
-            NodeContainer nC = (NodeContainer) entityContainer;
-            Node n = nC.getEntity();
+            //NodeContainer nC = (NodeContainer) entityContainer;
+            //Node n = nC.getEntity();
             nodes++;
         } else if(entityContainer instanceof WayContainer) {
             Way way = ((WayContainer) entityContainer).getEntity();
             String landuse = null;
-            Float ele = null;
+            float ele = Float.MIN_VALUE;
             try {
                 for(Tag tag : way.getTags()) {
                     if(tag.getKey().equals("landuse"))
@@ -55,10 +62,12 @@ public class PbfReader implements Sink {
                     else if(tag.getKey().equals("ele"))
                         ele = parseEle(tag.getValue());
                 }
-                if(landuse != null && ele != null) {
-                    System.out.println(ele + ": " + landuse);
+                if(landuse != null && ele != Float.MIN_VALUE) {
+                    if(!outs.containsKey(landuse))
+                        outs.put(landuse, new PrintWriter("C:\\tmp\\data\\" + landuse + ".dat"));
+                    outs.get(landuse).println(ele);
                 }
-            } catch(NumberFormatException ex) {
+            } catch(NumberFormatException | FileNotFoundException ex) {
                 System.out.println(ex.getMessage());
             }
         } else if(entityContainer instanceof RelationContainer) {
@@ -78,10 +87,21 @@ public class PbfReader implements Sink {
         try {
             return Float.parseFloat(ele);
         } catch(NumberFormatException ex) {
-            System.out.println(ex.getMessage());
-            for(String s : eleUnits)
-                ele = ele.replace(s, "");
-            Float f = Float.parseFloat(ele);
+            float f;
+            //System.out.print(ex.getMessage());
+            ele = ele.replaceAll("m", "").replaceAll(",", ".")
+                    .replaceAll("ca.", "").replaceAll("NN.", "")
+                    .replaceAll("NN", "");
+            if(ele.contains("ft"))
+                f = Float.parseFloat(ele.replaceAll("ft", "")) * 0.3048f;
+            else if(ele.matches("[0-9]+\\s*(-)\\s*[0-9]+")) {
+                String[] nums = ele.split("-");
+                f = (Float.parseFloat(nums[0]) + Float.parseFloat(nums[1])) / 2.0f;
+            } else if(ele.matches("\\D*") || ele.contains("'")) // Unter der Erde, No, no, ...
+                return Float.MIN_VALUE;
+            else
+                f = Float.parseFloat(ele);
+            //System.out.println(" => " + f);
             return f;
         }
     }
