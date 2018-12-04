@@ -58,7 +58,8 @@ public class Main {
             try {
                 PrintWriter out = new PrintWriter(basePath + "out\\" + in + ".dat");
                 for(Entry<Integer, Integer> e : res.entrySet())
-                    out.write(e.getKey() + ":" + ((float) e.getValue() / (float) sum) + "\n");
+                    out.write(e.getKey() + ":\"" + (e.getKey() * 50) + " - "
+                            + ((e.getKey() + 1) * 50) + "\":" + ((float) e.getValue() / (float) sum) + "\n");
                 out.close();
             } catch (FileNotFoundException ex) {
                 ex.printStackTrace();
