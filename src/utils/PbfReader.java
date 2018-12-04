@@ -1,11 +1,11 @@
 package utils;
 
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openstreetmap.osmosis.core.container.v0_6.EntityContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.NodeContainer;
@@ -18,24 +18,19 @@ import org.openstreetmap.osmosis.core.task.v0_6.Sink;
 import crosby.binary.osmosis.OsmosisReader;
 
 public class PbfReader implements Sink {
-    private int nodes = 0, rels = 0;
+    private AtomicInteger nodes = new AtomicInteger(0), rels = new AtomicInteger(0);
     private boolean started = false;
     private HashMap<String, PrintWriter> outs = new HashMap<String, PrintWriter>();
     
-    public static void main(String[] args) {
-        InputStream inp;
-        try {
-            inp = new FileInputStream("c:\\tmp\\germany.osm.pbf"); // Germany
-            OsmosisReader osm = new OsmosisReader(inp);
-            PbfReader pbfR = new PbfReader();
-            osm.setSink(pbfR);
-            osm.run();
-            System.out.println(pbfR.nodes + "   " + pbfR.rels);
-            for(PrintWriter out : pbfR.outs.values())
-                out.close();
-        } catch (FileNotFoundException ex) {
-            ex.printStackTrace();
-        }
+    public PbfReader(InputStream inp) {
+        //inp = new FileInputStream("c:\\tmp\\germany.osm.pbf"); // Germany
+        OsmosisReader osm = new OsmosisReader(inp);
+        PbfReader pbfR = this;
+        osm.setSink(pbfR);
+        osm.run();
+        System.out.println(pbfR.nodes + "   " + pbfR.rels);
+        for(PrintWriter out : pbfR.outs.values())
+            out.close();
     }
     
     @Override
@@ -50,7 +45,7 @@ public class PbfReader implements Sink {
         if(entityContainer instanceof NodeContainer) {
             //NodeContainer nC = (NodeContainer) entityContainer;
             //Node n = nC.getEntity();
-            nodes++;
+            nodes.incrementAndGet();
         } else if(entityContainer instanceof WayContainer) {
             Way way = ((WayContainer) entityContainer).getEntity();
             String landuse = null;
@@ -71,7 +66,7 @@ public class PbfReader implements Sink {
                 System.out.println(ex.getMessage());
             }
         } else if(entityContainer instanceof RelationContainer) {
-            rels++;
+            rels.incrementAndGet();
         } else {
             System.out.println("Unknown entity: " + entityContainer.getClass() + ", skipping");
         }

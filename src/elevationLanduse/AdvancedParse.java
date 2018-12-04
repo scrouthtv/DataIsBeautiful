@@ -24,6 +24,7 @@ public class AdvancedParse {
         //System.out.println(sc.nextLine());
     }
     
+    // THIS IS NOT WORKING; THE ONE BELOW AS WELL NOT WORKING
     public static InputStream streamPbfPlanet(URL url) throws IOException {
         URLConnection urlConnection = url.openConnection();
         BufferedInputStream in = new BufferedInputStream(urlConnection.getInputStream());
